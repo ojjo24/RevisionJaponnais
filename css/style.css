@@ -1,0 +1,37 @@
+:root{--bg:#f3f5f7;--ink:#1c2a3e;--ai:#274c77;--mut:#66758a;--ok:#2f7d57;--ko:#b3463a;--line:#d5dce5;font-family:'Zen Maru Gothic','Hiragino Sans','Noto Sans JP',system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-size:17px;line-height:1.5}
+#app{max-width:640px;margin:0 auto;padding:12px 16px calc(24px + env(safe-area-inset-bottom))}
+nav{display:flex;gap:6px;margin-bottom:20px}
+nav button{flex:1;background:none;border:0;border-bottom:3px solid transparent;border-radius:0}
+nav .on{border-color:var(--ai);font-weight:700}
+button,select,input,textarea{font:inherit;color:inherit;min-height:44px;padding:8px 14px;border:1px solid var(--line);border-radius:10px;background:#fff}
+button{cursor:pointer}
+button:disabled{cursor:default;color:var(--ink);opacity:1}
+:focus-visible{outline:3px solid #7aa7d9;outline-offset:1px}
+button.primary{background:var(--ai);border-color:var(--ai);color:#fff}
+button.danger{color:var(--ko)}
+.hero h1{font-size:2.4rem;margin:.6em 0 .2em}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.row{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.row>span{flex:1}
+.row small{margin-left:auto}
+input[type=checkbox]{min-height:0;width:22px;height:22px}
+.q{font-size:clamp(2.2rem,10vw,3.6rem);font-weight:700;text-align:center;padding:36px 12px;margin:8px 0 16px;background:#fff;border:1px solid var(--line);border-radius:18px;overflow-wrap:anywhere}
+form{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}form p{flex-basis:100%;margin:0}
+form input{flex:1;min-width:0;font-size:1.2rem}
+.opts{display:grid;gap:10px}
+.opts button{font-size:1.2rem;text-align:left;padding:14px 16px}
+.opts button.ok,.res.ok{border-color:var(--ok);background:#e6f3ec}
+.opts button.ko,.res.ko{border-color:var(--ko);background:#f9e8e5}
+.res{margin-top:16px;padding:14px;border:1px solid;border-radius:12px;display:grid;gap:8px;font-weight:700}
+.res small{font-weight:400}
+.muted,small{color:var(--mut)}
+progress{flex:1;height:10px;accent-color:var(--ai)}
+textarea{width:100%}
+select{max-width:100%}
+.tiles{display:grid;gap:10px;margin:18px 0}
+.tile{display:grid;gap:2px;text-align:left;padding:16px}
+.tile b{font-size:1.2rem}
+button.link{border:0;background:none;min-height:0;padding:0;text-decoration:underline;color:var(--mut)}
+.q.long{font-size:1.6rem}
