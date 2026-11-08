@@ -16,7 +16,12 @@ const h = (t, a = {}, ...k) => {
 };
 const count = id => st.cards.filter(c => c.lesson_id === id).length;
 const catOf = id => st.lessons.find(l => l.id === id)?.category;
-const dur = s => `${Math.floor(s / 3600)} h ${Math.floor(s % 3600 / 60)} min`;
+const dur = s => {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor(s % 3600 / 60);
+  const sec = s % 60;
+  return `${h} h ${m} min ${sec} sec`;
+};
 const fmt = c => [c.fr, c.jp, c.reading || '', c.alt_fr.join('|'), c.alt_jp.join('|'), c.note || ''].join(';');
 const parse = l => { const [fr, jp, reading, af, aj, note] = l.split(';').map(x => x.trim()); return { fr, jp, reading: reading || null, alt_fr: af ? af.split('|') : [], alt_jp: aj ? aj.split('|') : [], note: note || null }; };
 
@@ -49,7 +54,19 @@ function start() {
     e.pool = dist(a, e.ak) >= 4 ? a : b;
     if (dist(e.pool, e.ak) < 4) e.qcm = false;
   });
-  st.s = { list: items, i: 0, ok: 0, ko: 0, res: null, typed: '' };
+  st.s = {
+  list: items,
+  i: 0,
+  ok: 0,
+  ko: 0,
+  res: null,
+  typed: '',
+  startAt: Date.now(),
+  sent: false,
+  saving: false,
+  saved: false,
+  saveError: null
+};
   go('review');
 }
 const progress = () => {
@@ -86,8 +103,40 @@ const views = {
   },
   review() {
     const s = st.s, e = s.list[s.i];
-    const send = d => { if (s.sent) return; s.sent = true; if (st.user && s.ok + s.ko) sb.rpc('record_answers', { c: s.ok, w: s.ko, done: d }); };
-    if (!e) return h('section', {}, h('h2', {}, `Terminé : ${s.ok} / ${s.list.length}`), h('p', { className: 'muted' }, st.user ? 'Résultats enregistrés.' : 'Connectez-vous pour enregistrer vos résultats.'), h('button', { className: 'primary', onclick: () => go('cat') }, 'Retour'));
+    const send = async d => {
+  if (s.sent) return;
+  s.sent = true;
+
+  if (!st.user || !(s.ok + s.ko)) return;
+
+  s.saving = true;
+
+  const { error } = await sb.rpc('record_answers', {
+    c: s.ok,
+    w: s.ko,
+    done: d
+  });
+
+  s.saving = false;
+  s.saved = !error;
+  s.saveError = error?.message || null;
+
+  if (st.v === 'review' && st.s === s) render();
+};
+  if (!e) return h('section', {},
+  h('h2', {}, `Terminé : ${s.ok} / ${s.list.length}`),
+  h('p', {}, `Bonnes réponses : ${s.ok}`),
+  h('p', {}, `Mauvaises réponses : ${s.ko}`),
+  h('p', {}, `Temps : ${Math.floor((Date.now() - s.startAt) / 60000)} min ${Math.floor((Date.now() - s.startAt) / 1000) % 60} sec`),
+  h('p', { className: 'muted' },
+    !st.user ? 'Connectez-vous pour enregistrer vos résultats.' :
+    s.saving ? 'Enregistrement en cours...' :
+    s.saved ? 'Résultats enregistrés.' :
+    s.saveError ? 'Erreur : ' + s.saveError :
+    'Aucun résultat à enregistrer.'
+  ),
+  h('button', { className: 'primary', onclick: () => go('cat') }, 'Retour')
+);
     const c = e.c, acc = [c[e.ak], ...(e.ak === 'fr' ? c.alt_fr : c.alt_jp)], last = s.i + 1 >= s.list.length;
     const answer = ok => { record(c.id, ok); ok ? s.ok++ : s.ko++; s.res = ok; if (last) send(true); render(); };
     const next = () => { s.i++; s.res = s.opts = s.pick = null; s.typed = ''; render(); };
@@ -101,7 +150,18 @@ const views = {
     }
     const q = c[e.qk];
     return h('section', {},
-      h('div', { className: 'bar' }, h('progress', { max: s.list.length, value: s.i }), h('button', { onclick: () => { if (confirm('Quitter le quiz ?')) { send(false); go('setup'); } } }, 'Quitter')),
+      h('div', { className: 'bar' },
+        h('progress', { max: s.list.length, value: s.i }),
+        h('strong', { id: 'quiz-timer' }, '00:00'),
+        h('button', {
+          onclick: () => {
+            if (confirm('Quitter le quiz ?')) {
+               send(false);
+               go('setup');
+             }
+            }
+          }, 'Quitter')
+        ),
       h('p', { className: 'muted' }, `${LBL[e.ak][e.qcm ? 0 : 1]} (${s.i + 1}/${s.list.length})`),
       h('div', { className: 'q' + (q.length > 12 ? ' long' : ''), lang: e.qk === 'fr' ? 'fr' : 'ja' }, q), body,
       s.res === null ? null : h('div', { className: 'res ' + (s.res ? 'ok' : 'ko') }, s.res ? 'Correct' : 'Incorrect. Réponse : ' + acc.join(' / '),
@@ -200,7 +260,22 @@ sb.auth.onAuthStateChange((_e, ses) => {
 let act = Date.now();
 ['pointerdown', 'keydown', 'scroll'].forEach(ev => addEventListener(ev, () => act = Date.now(), { passive: true }));
 setInterval(() => { if (st.user && !document.hidden && Date.now() - act < 6e4) sb.rpc('ping'); }, 15000);
+// Chronomètre du quiz : actualisation chaque seconde.
+setInterval(() => {
+  if (st.v !== 'review' || !st.s) return;
 
+  const elapsed = Math.floor((Date.now() - st.s.startAt) / 1000);
+  const minutes = Math.floor(elapsed / 60);
+  const seconds = elapsed % 60;
+
+  const timer = document.getElementById('quiz-timer');
+
+  if (timer) {
+    timer.textContent =
+      String(minutes).padStart(2, '0') + ':' +
+      String(seconds).padStart(2, '0');
+  }
+}, 1000);
 render();
 if (C.SUPABASE_URL.includes('VOTRE')) root.prepend(h('p', { className: 'res ko' }, 'Configuration manquante : renseignez js/config.js (URL, clé anon, e-mail admin).'));
 else try { await refresh(); render(); } catch (e) { root.prepend(h('p', { className: 'res ko' }, 'Erreur : ' + (e.message || e))); }
